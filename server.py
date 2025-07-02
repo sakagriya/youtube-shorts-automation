@@ -6,7 +6,7 @@ from moviepy.editor import VideoFileClip, AudioFileClip
 
 app = Flask(__name__)
 
-@app.route('/process', methods=['POST'])
+@app.route('/run', methods=['POST'])  # <- Ganti dari '/process' ke '/run'
 def process_video():
     try:
         data = request.json
@@ -16,7 +16,7 @@ def process_video():
         username = data.get('username', 'Unknown')
         output_path = '/output/final_output.mp4'
 
-        # --------- 1. Ambil Video ---------
+        # 1. Ambil Video
         if 'video_url' in data:
             video_path = '/tmp/input_video.mp4'
             download_file(data['video_url'], video_path)
@@ -27,7 +27,7 @@ def process_video():
         else:
             return jsonify({'error': 'No video input provided.'}), 400
 
-        # --------- 2. Ambil Audio (Voice Over) ---------
+        # 2. Ambil Audio (Voice Over)
         if 'audio_url' in data:
             audio_path = '/tmp/input_audio.mp3'
             download_file(data['audio_url'], audio_path)
@@ -36,26 +36,26 @@ def process_video():
             audio_path = '/tmp/input_audio.mp3'
             audio_file.save(audio_path)
 
-        # --------- 3. Load Video Clip ---------
+        # 3. Load Video Clip
         video_clip = VideoFileClip(video_path)
 
-        # --------- 4. Apply Ducking ---------
+        # 4. Apply Ducking
         if audio_path:
             ducked_video = apply_ducking(video_clip, audio_path)
         else:
             ducked_video = video_clip
 
-        # --------- 5. Tambah Watermark ---------
+        # 5. Tambah Watermark
         watermarked_video = add_watermark(ducked_video, username)
 
-        # --------- 6. Tambah Subtitle ---------
+        # 6. Tambah Subtitle
         final_video = add_subtitle(watermarked_video, subtitle_text)
 
-        # --------- 7. Export Video ---------
+        # 7. Export Video
         os.makedirs('/output', exist_ok=True)
         final_video.write_videofile(output_path, codec='libx264', audio_codec='aac')
 
-        # --------- 8. Upload ke YouTube ---------
+        # 8. Upload ke YouTube
         video_title = data.get('title', 'Automated YouTube Shorts')
         video_description = data.get('description', 'Uploaded via Automation')
         video_tags = data.get('tags', ['shorts'])
