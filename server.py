@@ -1,71 +1,71 @@
 from flask import Flask, request, jsonify
-from utils import download_file, apply_ducking, add_watermark, add_subtitles
-from youtube_uploader import upload_video_to_youtube
+from utils import download_file, apply_ducking, add_watermark, add_subtitle
+from youtube_uploader import upload_to_youtube
 import os
-from config import YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN
+from moviepy.editor import VideoFileClip, AudioFileClip
 
 app = Flask(__name__)
 
-OUTPUT_FOLDER = "./output"
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
-@app.route("/process", methods=["POST"])
+@app.route('/process', methods=['POST'])
 def process_video():
     try:
         data = request.json
-
         video_path = None
         audio_path = None
-        subtitle_path = None
-        username = data.get("username", "unknown")
+        subtitle_text = data.get('subtitle_text', '')
+        username = data.get('username', 'Unknown')
+        output_path = '/output/final_output.mp4'
 
-        # ==== Handle Video ====
-        if "video_url" in data:
-            video_path = download_file(data["video_url"], "input_video.mp4")
-        elif "video_file" in data:
-            video_path = data["video_file"]
+        # --------- 1. Ambil Video ---------
+        if 'video_url' in data:
+            video_path = '/tmp/input_video.mp4'
+            download_file(data['video_url'], video_path)
+        elif 'video_file' in request.files:
+            video_file = request.files['video_file']
+            video_path = '/tmp/input_video.mp4'
+            video_file.save(video_path)
         else:
-            return jsonify({"error": "No video_url or video_file provided"}), 400
+            return jsonify({'error': 'No video input provided.'}), 400
 
-        # ==== Handle Audio (VO) ====
-        if "audio_url" in data:
-            audio_path = download_file(data["audio_url"], "input_audio.mp3")
-        elif "audio_file" in data:
-            audio_path = data["audio_file"]
+        # --------- 2. Ambil Audio (Voice Over) ---------
+        if 'audio_url' in data:
+            audio_path = '/tmp/input_audio.mp3'
+            download_file(data['audio_url'], audio_path)
+        elif 'audio_file' in request.files:
+            audio_file = request.files['audio_file']
+            audio_path = '/tmp/input_audio.mp3'
+            audio_file.save(audio_path)
+
+        # --------- 3. Load Video Clip ---------
+        video_clip = VideoFileClip(video_path)
+
+        # --------- 4. Apply Ducking ---------
+        if audio_path:
+            ducked_video = apply_ducking(video_clip, audio_path)
         else:
-            return jsonify({"error": "No audio_url or audio_file provided"}), 400
+            ducked_video = video_clip
 
-        # ==== Handle Subtitle ====
-        if "subtitle_text" in data:
-            subtitle_path = os.path.join(OUTPUT_FOLDER, "subtitles.srt")
-            with open(subtitle_path, "w", encoding="utf-8") as f:
-                f.write(data["subtitle_text"])
+        # --------- 5. Tambah Watermark ---------
+        watermarked_video = add_watermark(ducked_video, username)
 
-        # ==== Process ====
-        output_path = os.path.join(OUTPUT_FOLDER, "final_output.mp4")
-        apply_ducking(video_path, audio_path, output_path)
-        add_watermark(output_path, username)
-        if subtitle_path:
-            add_subtitles(output_path, subtitle_path)
+        # --------- 6. Tambah Subtitle ---------
+        final_video = add_subtitle(watermarked_video, subtitle_text)
 
-        # ==== Upload to YouTube ====
-        youtube_response = upload_video_to_youtube(
-            output_path,
-            title=data.get("youtube_title", "Automated Shorts"),
-            description=data.get("youtube_description", ""),
-            client_id=YOUTUBE_CLIENT_ID,
-            client_secret=YOUTUBE_CLIENT_SECRET,
-            refresh_token=YOUTUBE_REFRESH_TOKEN
-        )
+        # --------- 7. Export Video ---------
+        os.makedirs('/output', exist_ok=True)
+        final_video.write_videofile(output_path, codec='libx264', audio_codec='aac')
 
-        return jsonify({
-            "status": "success",
-            "youtube_response": youtube_response
-        })
+        # --------- 8. Upload ke YouTube ---------
+        video_title = data.get('title', 'Automated YouTube Shorts')
+        video_description = data.get('description', 'Uploaded via Automation')
+        video_tags = data.get('tags', ['shorts'])
+
+        youtube_url = upload_to_youtube(output_path, video_title, video_description, video_tags)
+
+        return jsonify({'status': 'success', 'youtube_url': youtube_url})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
