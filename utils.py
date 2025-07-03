@@ -48,19 +48,10 @@ def add_watermark(video_path, username):
 
 def add_subtitle(video_path, subtitle_text):
     temp_output = "with_subs.mp4"
-
-    drawtext_filter = (
-        f"drawtext=text='{subtitle_text}':"
-        "fontcolor=white@0.9:"
-        "fontsize=30:"
-        "box=1:boxcolor=black@0.5:boxborderw=5:"
-        "x=(w-text_w)/2:y=h-(text_h*2)"
-    )
-
     subtitle_command = [
         "ffmpeg", "-y",
         "-i", video_path,
-        "-vf", drawtext_filter,
+        "-vf", f"drawtext=text='{subtitle_text}':fontcolor=white:fontsize=24:x=(w-text_w)/2:y=h-60:shadowcolor=black:shadowx=2:shadowy=2",
         "-c:a", "copy",
         temp_output
     ]
