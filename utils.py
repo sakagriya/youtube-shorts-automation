@@ -46,12 +46,21 @@ def add_watermark(video_path, username):
     subprocess.run(watermark_command, check=True)
     os.replace(temp_output, video_path)
 
-def add_subtitles(video_path, subtitle_path):
+def add_subtitle(video_path, subtitle_text):
     temp_output = "with_subs.mp4"
+
+    drawtext_filter = (
+        f"drawtext=text='{subtitle_text}':"
+        "fontcolor=white@0.9:"
+        "fontsize=30:"
+        "box=1:boxcolor=black@0.5:boxborderw=5:"
+        "x=(w-text_w)/2:y=h-(text_h*2)"
+    )
+
     subtitle_command = [
         "ffmpeg", "-y",
         "-i", video_path,
-        "-vf", f"subtitles={subtitle_path}",
+        "-vf", drawtext_filter,
         "-c:a", "copy",
         temp_output
     ]
